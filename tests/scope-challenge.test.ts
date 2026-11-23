@@ -32,6 +32,8 @@ const GET_DNS = `async () => cloudflare.request({ method: "GET", path: "${DNS_PA
 const ACCOUNT_ID = 'acc-1'
 const KV_PATH = `/accounts/${ACCOUNT_ID}/storage/kv/namespaces`
 const CREATE_KV = `async () => cloudflare.request({ method: "POST", path: "${KV_PATH}", body: { title: "t" } })`
+const D1_EXPORT_PATH = `/accounts/${ACCOUNT_ID}/d1/database/db-1/export`
+const D1_EXPORT = `async () => cloudflare.request({ method: "POST", path: "${D1_EXPORT_PATH}", body: { output_format: "polling" } })`
 const CHATGPT_REDIRECT = 'https://chatgpt.com/connector_platform_oauth_redirect'
 
 beforeEach(async () => {
@@ -52,6 +54,9 @@ beforeEach(async () => {
       '/zones/{zone_id}/settings': {
         get: { summary: 'Zone Settings', 'x-api-token-group': ['Zone Settings Read'] }
       },
+      '/accounts/{account_id}/d1/database/{database_id}/export': {
+        post: { summary: 'Export D1 Database as SQL' }
+      },
       '/accounts/{account_id}/storage/kv/namespaces': {
         post: { summary: 'Create a Namespace', 'x-api-token-group': ['Workers KV Storage Write'] }
       }
@@ -69,6 +74,11 @@ beforeEach(async () => {
       HttpResponse.json(cfSuccess([{ id: 'ssl', value: 'full' }]))
     ),
     // Cloudflare answers some missing OAuth scopes with 401, not 403.
+    http.post(`${API_BASE}${D1_EXPORT_PATH}`, () =>
+      HttpResponse.json(cfError([{ code: 10000, message: 'Authentication error' }]), {
+        status: 401
+      })
+    ),
     http.post(`${API_BASE}${KV_PATH}`, () =>
       HttpResponse.json(cfError([{ code: 10000, message: 'Authentication error' }]), {
         status: 401
@@ -120,6 +130,18 @@ describe('execute', () => {
     expect((await parseMcpResult(response)).result?.content?.[0]?.text).toContain(
       'Reconnect only if other requests fail with 401 too.'
     )
+  })
+
+  it('does not tell a working connection to sign in again when the spec lists no permissions', async () => {
+    const token = await connectWithOAuth([...BASELINE, 'd1.read'])
+    const response = await executeModern(token, D1_EXPORT)
+
+    expect(response.status).toBe(200)
+    const text = (await parseMcpResult(response)).result?.content?.[0]?.text ?? ''
+    expect(text).toContain('returned HTTP 401')
+    expect(text).toContain('The API spec lists no permissions for this endpoint')
+    expect(text).toContain('Reconnect only if other requests fail with 401 too')
+    expect(text).not.toContain('Reconnect to sign in again')
   })
 
   it('challenges a 2025-era request too', async () => {

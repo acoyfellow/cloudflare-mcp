@@ -277,7 +277,10 @@ describe('explainRefusal', () => {
     )
     expect(explain(403, oauth('dns.read'), DNS)).toContain('reconnecting will not help')
     // No permissions in the spec.
-    expect(explain(401, oauth(), undefined)).toContain('Reconnect to sign in again')
+    expect(explain(401, oauth(), undefined)).toContain(
+      'Reconnect only if other requests fail with 401 too'
+    )
+    expect(explain(401, oauth(), undefined)).not.toContain('Reconnect to sign in again')
     expect(explain(401, DIRECT_CONNECTION, undefined)).toContain('API token is valid')
     // A direct token's permissions are unknown, so a 401 lists what it needs too.
     expect(explain(401, DIRECT_CONNECTION, DNS)).toBe(

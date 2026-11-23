@@ -311,7 +311,7 @@ export function explainRefusal(status: 401 | 403, authorization: Authorization):
     case 'unlisted':
       if (status === 401) {
         return authorization.connection === 'oauth'
-          ? 'Cloudflare did not accept this connection’s credentials. Reconnect to sign in again.'
+          ? 'The API spec lists no permissions for this endpoint, so this server cannot tell which scope it needs. Cloudflare answers 401 both when it rejects the credential and, on routes such as Workers KV and D1, when the connection lacks a scope the endpoint needs. Reconnect only if other requests fail with 401 too; otherwise reconnect and grant the write scope for this product, or use an API token.'
           : 'Cloudflare did not accept this credential. Check that the API token is valid and has not expired.'
       }
       return 'The API spec lists no permissions for this endpoint. HTTP 403 means the credential was accepted but is not allowed to do this, so reconnecting with the same permissions will not help. Check the endpoint’s documentation.'
